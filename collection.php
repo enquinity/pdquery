@@ -143,7 +143,11 @@ class Collection implements \IteratorAggregate, \Countable {
     public function __construct($data) {
         $this->data = $data;
     }
-    
+
+    public function isArray() {
+        return is_array($this->data);
+    }
+
     /**
      * 
      * @return array
