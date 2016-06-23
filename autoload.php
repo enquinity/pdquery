@@ -6,8 +6,8 @@ spl_autoload_register(function($clsName) {
     if (false !== $p) {
         $ns = substr($clsName, 0, $p);
         $clsName = substr($clsName, $p + 1);
-    }    
-    if (substr($ns, 0, 6) !== 'pdquery') return;
+    }
+    if (substr($ns, 0, 7) !== 'pdquery') return;
     if ($clsName == 'Collection' || $clsName == 'CollectionTools') {
         require_once(__DIR__ . '/collection.php');
     } elseif ($ns == 'pdquery\EntityModel') {
