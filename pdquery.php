@@ -43,7 +43,7 @@ interface IDataSourceUpdater {
 interface IQuery extends \Countable, \IteratorAggregate {
     /**
      *
-     * @param string $relationName
+     * @param string ...$relationName
      * @return IQuery
      */
     public function withRelation($relationName);

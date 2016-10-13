@@ -498,7 +498,8 @@ class SelectQueryBuilder extends BaseQueryBuilder {
         $limit = $this->query->getLimit();
         $offset = $this->query->getOffset();
         if (null !== $limit || null !== $offset) {
-            $sql .= $sqlDialect->getLimitAndOffsetSqlPart($limit, $offset);
+            //$sql .= $sqlDialect->getLimitAndOffsetSqlPart($limit, $offset);
+            $sql = $sqlDialect->sqlSetSelectLimit($sql, $limit, $offset);
         }
         return $sql;
     }

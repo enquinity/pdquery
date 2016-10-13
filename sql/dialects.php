@@ -8,7 +8,16 @@ interface ISqlDialect {
     public function encodeColumnAlias($columnAlias); // enkoduje część kolumna AS $columnAlias
     public function encodeTableAlias($tableAlias);
     public function valueToSql($value, $type);
-    public function getLimitAndOffsetSqlPart($limit, $offset);
+
+    /**
+     * Przekształca podane zapytanie dodając limit (i ewentualnie offset).
+     * @param string $selectSql
+     * @param int    $limit
+     * @param int    $offset
+     * @return string
+     */
+    public function sqlSetSelectLimit($selectSql, $limit, $offset = null);
+    //public function getLimitAndOffsetSqlPart($limit, $offset);
 }
 
 class MySqlDialect implements ISqlDialect {
@@ -57,11 +66,17 @@ class MySqlDialect implements ISqlDialect {
         }
     }
 
-    public function getLimitAndOffsetSqlPart($limit, $offset) {
+    public function sqlSetSelectLimit($selectSql, $limit, $offset = null) {
+        if (null === $limit) $limit = '18446744073709551615'; else $limit = (int)$limit;
+        if (null === $offset) $offset = 0; else $offset = (int)$offset;
+        return $selectSql . " LIMIT $offset, $limit";
+    }
+
+    /*public function getLimitAndOffsetSqlPart($limit, $offset) {
         if (null === $limit) $limit = '18446744073709551615'; else $limit = (int)$limit;
         if (null === $offset) $offset = 0; else $offset = (int)$offset;
         return " LIMIT $offset, $limit";
-    }
+    }*/
 }
 
 class MySqliDialect extends MySqlDialect {
