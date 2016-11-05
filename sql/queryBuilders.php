@@ -132,7 +132,8 @@ class BaseQueryBuilder {
         $this->sourcesByRelationPath[''] = array(
             'relationPath' => '',
             'entityName' => $this->entityName,
-            'entityAlias' => $entityAlias,
+            //'entityAlias' => $entityAlias,
+            'entityAlias' => $this->entityModel->getDbTableName($this->entityName),
         );
         $entityRelations = $this->query->getIncludeRelations();
         if (!empty($entityRelations)) {
@@ -173,7 +174,7 @@ class BaseQueryBuilder {
 
     protected function sourcesToSql(ISqlDialect $sqlDialect) {
         $sql = $sqlDialect->encodeTableName($this->entityModel->getDbTableName($this->entityName));
-        $sql .= ' ' . $sqlDialect->encodeTableAlias($this->sourcesByRelationPath['']['entityAlias']);
+        //$sql .= ' ' . $sqlDialect->encodeTableAlias($this->sourcesByRelationPath['']['entityAlias']); // nie używamy, bo aliasem jest nazwa tabeli
         foreach ($this->joins as $join) {
             $jLeftSource = $this->sourcesByRelationPath[$join['fromRelPath']];
             $jRightSource = $this->sourcesByRelationPath[$join['toRelPath']];

@@ -1,6 +1,9 @@
 <?php
 /**
- * pdquery v1.0.0
+ * pdquery v1.1.0
+ * zmiany:
+ * 1.1.0
+ * - dodanie wsparcia dla ms sql
  */
 namespace pdquery;
 

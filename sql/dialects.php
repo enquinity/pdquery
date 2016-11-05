@@ -97,3 +97,62 @@ class MySqliDialect extends MySqlDialect {
         return "'" . $this->mysqli->real_escape_string($str) . "'";
     }
 }
+
+class MsSqlDialect implements ISqlDialect {
+    public function encodeColumnName($columnName) {
+        return '[' . $columnName . ']';
+    }
+
+    public function encodeTableName($tableName) {
+        return '[' . $tableName . ']';
+    }
+
+    protected function escStr($str) {
+        foreach (['r', 'n', 't'] as $char) {
+            $str = str_replace("\\" . $char, "\\\\" . $char, $str);
+        }
+        return "'" . str_replace("'", "''", $str) . "'";
+    }
+
+    public function encodeColumnAlias($columnAlias) {
+        return $this->escStr($columnAlias);
+    }
+
+    public function encodeTableAlias($tableAlias) {
+        return '[' . $tableAlias . ']';
+    }
+
+    public function valueToSql($value, $type) {
+        if (null === $value) return 'NULL';
+        if ($type == IEntityFieldType::IMPLICIT) {
+            if (is_int($value)) $type = IEntityFieldType::INT;
+            elseif (is_float($value)) $type = IEntityFieldType::FLOAT;
+            elseif (is_string($value)) $type = IEntityFieldType::STRING;
+            elseif (is_bool($value)) $type = IEntityFieldType::BOOL;
+        }
+        switch ($type) {
+            case IEntityFieldType::STRING:
+                return $this->escStr($value);
+            case IEntityFieldType::BOOL:
+                return $value ? 1 : 0;
+            case IEntityFieldType::INT:
+                return (int)$value;
+            case IEntityFieldType::FLOAT:
+                return (float)$value;
+            default:
+                throw new \Exception("MS SQL unknown type $type");
+        }
+    }
+
+    public function sqlSetSelectLimit($selectSql, $limit, $offset = null) {
+        // TODO: lepsze wykrywanie order by (pomijanie w stringach)
+        if (!preg_match('/\s+ORDER\s+BY\s+/i', $selectSql)) $selectSql .= ' ORDER BY 1';
+        $offset = null === $offset ? 0 : (int)$offset;
+        $selectSql .= ' OFFSET ' . $offset . ' ROWS';
+        if ($limit !== null) {
+            $limit = (int)$limit;
+            $selectSql .= ' FETCH NEXT ' . $limit . ' ROWS ONLY';
+        }
+        return $selectSql;
+    }
+}
