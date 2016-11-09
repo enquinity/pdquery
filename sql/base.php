@@ -5,7 +5,7 @@ use pdquery\Sql\Dialects\ISqlDialect;
 
 interface ISqlDataSource extends \pdquery\IDataSource {
     public function getSelectSql(\pdquery\IQueryProperties $query);
-    public function getCountSql(\pdquery\ICountQueryProperties $query);
+    public function getCountSql(\pdquery\IQueryProperties $query);
 }
 
 interface ISqlDataSourceUpdater extends \pdquery\IDataSourceUpdater {
@@ -15,10 +15,6 @@ interface ISqlDataSourceUpdater extends \pdquery\IDataSourceUpdater {
 
 interface ISqlQuery extends \pdquery\IQuery {
     public function getSelectSql();
-}
-
-interface ISqlCountQuery extends \pdquery\ICountQuery {
-    public function getCountSql();
 }
 
 interface ISqlUpdateQuery extends \pdquery\IUpdateQuery {
@@ -37,13 +33,6 @@ class SqlQuery extends \pdquery\Query implements ISqlQuery {
 
     public function getSelectSql() {
         return $this->dataSource->getSelectSql($this);
-    }
-}
-
-class SqlCountQuery extends \pdquery\CountQuery implements ISqlCountQuery {
-
-    public function __construct(ISqlDataSource $dataSource = null) {
-        parent::__construct($dataSource);
     }
 
     public function getCountSql() {
@@ -122,7 +111,7 @@ abstract class SqlDataSource implements ISqlDataSource, ISqlDataSourceUpdater {
         return $sql;
     }
 
-    public function getCountSql(\pdquery\ICountQueryProperties $query) {
+    public function getCountSql(\pdquery\IQueryProperties $query) {
         $queryBuilder = new CountQueryBuilder($query, $this->entityClass, $this->entityModel, 'count', $this->complexFields, $this->countQueryTemplate, $this->countQueryTemplateParams);
         $sql = $queryBuilder->getSql($this->sqlDialect);
         return $sql;
@@ -145,13 +134,6 @@ abstract class SqlDataSource implements ISqlDataSource, ISqlDataSourceUpdater {
      */
     public function query() {
         return new SqlQuery($this);
-    }
-
-    /**
-     * @return \pdquery\ICountQuery
-     */
-    public function countQuery() {
-        return new SqlCountQuery($this);
     }
 
     /**

@@ -1,7 +1,11 @@
 <?php
 /**
- * pdquery v1.1.0
+ * pdquery v2.0.0
  * zmiany:
+ * 2.2.0
+ * - usunięcie CountQuery (obiekty i interfejsy) - przeniesienie funkcjonalności do IQuery, zmiana nazwy metody w źródle na countRows [utrata kompatybilności wstecz]
+ * - dodanie metody hasRows (IQuery, IDataSource) [utrata kompatybilności wstecz - konieczność zaimplementowania metody w źródle danych]
+ * - poprawiony autoloader (podział na pliki autoloader - tu wprowadzenie klasy i autoload - rejestracja autoloadera)
  * 1.1.0
  * - dodanie wsparcia dla ms sql
  */
@@ -10,17 +14,13 @@ namespace pdquery;
 interface IDataSource {
     public function getData(IQueryProperties $query, $selectOptions = null);
     public function getFirst(IQueryProperties $query, $selectOptions = null);
-    public function count(ICountQueryProperties $query, $countOptions = null);
+    public function hasRows(IQueryProperties $query, $options = null);
+    public function countRows(IQueryProperties $query, $countOptions = null);
 
     /**
      * @return IQuery
      */
     public function query();
-
-    /**
-     * @return ICountQuery
-     */
-    public function countQuery();
 }
 
 interface IDataSourceUpdater {
@@ -141,6 +141,12 @@ interface IQuery extends \Countable, \IteratorAggregate {
      * Np. ...query()->selectFirst()['id'] można zapisać jako ...query()->fields('id')->selectScalar()
      */
     public function selectScalar();
+
+    /**
+     * Zwraca true, jeśli zapytanie ma wyniki (ilość wierszy > 0)
+     * @return bool
+     */
+    public function hasRows();
 }
 
 interface IBaseQueryProperties {
@@ -154,49 +160,6 @@ interface IQueryProperties extends IBaseQueryProperties {
     public function getGroupBy();
     public function getLimit();
     public function getOffset();
-}
-
-interface ICountQuery extends \Countable {
-    /**
-     *
-     * @param string $relationName
-     * @return ICountQuery
-     */
-    public function withRelation($relationName);
-
-    /**
-     * Przykłady:
-     * ->where('id', 5)
-     * ->where('id', '<>', 5)
-     * ->where('accepted')
-     * ->where('date', '>', '2015-05-05')
-     * ->where('id', [1,2,3])
-     *
-     * Warunki podrzędne - np. dla WHERE date > '2015-05-05' AND (date < '2018' OR status = 'planned')
-     * $query = new Query(); // lub w inny sposób pobieramy zapytanie (np. z repozytorium jakiegoś modelu)
-     * $query->where('date', '>', '2015-05-05')
-     *  ->where(
-     *      subWhere('date', '<', '2018')
-     *               ->orWhere('status', 'planned'
-     *  )
-     *
-     * @param string $field
-     * @param mixed  $valueOrOperator Wartość pola lub operator (jeśli operator to wartość pola podawana w 3-cim argumencie)
-     * @return ICountQuery
-     */
-    public function where($field, $valueOrOperator = 1);
-
-    /**
-     *
-     * @param string $field
-     * @param mixed  $valueOrOperator Wartość pola lub operator (jeśli operator to wartość pola podawana w 3-cim argumencie)
-     * @return ICountQuery
-     */
-    public function orWhere($field, $valueOrOperator = 1);
-}
-
-interface ICountQueryProperties extends IBaseQueryProperties {
-    // EMPTY
 }
 
 interface IUpdateQuery {
@@ -431,34 +394,6 @@ class BaseQuery implements IBaseQueryProperties {
     }
 }
 
-class CountQuery extends BaseQuery implements ICountQuery, ICountQueryProperties {
-
-    /**
-     *
-     * @var IDataSource
-     */
-    protected $dataSource;
-
-    public function __construct(IDataSource $dataSource = null) {
-        $this->dataSource = $dataSource;
-    }
-
-    /**
-     * @param IQueryProperties $selectQuery
-     * @param IDataSource      $dataSource
-     * @return CountQuery
-     */
-    public static function fromSelectQueryProperties(IQueryProperties $selectQuery, IDataSource $dataSource = null) {
-        $q = new self($dataSource);
-        $q->where = $selectQuery->getWhere();
-        $q->includeRelations = $selectQuery->getIncludeRelations();
-        return $q;
-    }
-
-    public function count() {
-        return $this->dataSource->count($this);
-    }
-}
 
 class Query extends BaseQuery implements IQuery, IQueryProperties {
     protected $fields = '*';
@@ -565,7 +500,11 @@ class Query extends BaseQuery implements IQuery, IQueryProperties {
     }
 
     public function count() {
-        return $this->dataSource->count(CountQuery::fromSelectQueryProperties($this));
+        return $this->dataSource->getRowsCount($this);
+    }
+
+    public function hasRows() {
+        return $this->dataSource->hasRows($this);
     }
 
     public function getOrderBy() {

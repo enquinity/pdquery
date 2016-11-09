@@ -526,13 +526,13 @@ class SelectQueryBuilder extends BaseQueryBuilder {
 class CountQueryBuilder extends BaseQueryBuilder {
     /**
      *
-     * @var \pdquery\ICountQueryProperties
+     * @var \pdquery\IQueryProperties
      */
     protected $query;
 
     protected $countFieldAlias;
 
-    public function __construct(\pdquery\ICountQueryProperties $query, $entityName, IEntityModel $entityModel, $countFieldAlias = 'count', $complexFields = [], $sqlTemplate = null, $sqlTemplateParams = []) {
+    public function __construct(\pdquery\IQueryProperties $query, $entityName, IEntityModel $entityModel, $countFieldAlias = 'count', $complexFields = [], $sqlTemplate = null, $sqlTemplateParams = []) {
         if (empty($sqlTemplate)) {
             $sqlTemplate = 'SELECT %(columns) FROM %(tables) [WHERE]%(where)';
             $sqlTemplateParams = [];
