@@ -2,10 +2,12 @@
 /**
  * pdquery v2.0.0
  * zmiany:
- * 2.2.0
+ * 2.0.0
  * - usunięcie CountQuery (obiekty i interfejsy) - przeniesienie funkcjonalności do IQuery, zmiana nazwy metody w źródle na countRows [utrata kompatybilności wstecz]
  * - dodanie metody hasRows (IQuery, IDataSource) [utrata kompatybilności wstecz - konieczność zaimplementowania metody w źródle danych]
  * - poprawiony autoloader (podział na pliki autoloader - tu wprowadzenie klasy i autoload - rejestracja autoloadera)
+ * - dodanie klasy OverrideQueryProperties
+ * - drobne poprawki
  * 1.1.0
  * - dodanie wsparcia dla ms sql
  */
@@ -131,7 +133,6 @@ interface IQuery extends \Countable, \IteratorAggregate {
 
     /**
      * Select domyślnie powinien zwracać kolekcję.
-     * @return Collection    
      */
     public function select();
     
@@ -597,5 +598,141 @@ class DeleteQuery extends BaseQuery implements IDeleteQuery, IDeleteQueryPropert
 
     public function delete() {
         return $this->dataSource->deleteData($this, func_get_args());
+    }
+}
+
+/**
+ * Klasa służąca do nadpisywania wybranych parametrów zapytania.
+ */
+class OverrideQueryProperties implements IQueryProperties {
+
+    /**
+     * @var IQueryProperties
+     */
+    protected $originalQueryProperties;
+    
+    protected $includeRelations;
+    protected $where;
+    protected $orderBy;
+    protected $fields;
+    protected $groupBy;
+    protected $limit;
+    protected $offset;
+    
+    protected $overrideIncludeRelations = false;
+    protected $overrideWhere = false;
+    protected $overrideOrderBy = false;
+    protected $overrideFields = false;
+    protected $overrideGroupBy = false;
+    protected $overrideLimit = false;
+    protected $overrideOffset = false;
+
+    public function __construct(IQueryProperties $originalQueryProperties) {
+        $this->originalQueryProperties = $originalQueryProperties;
+    }
+
+    public function getIncludeRelations() {
+        if ($this->overrideIncludeRelations !== null) return $this->includeRelations;
+        return $this->originalQueryProperties->getIncludeRelations();
+    }
+
+    public function getWhere() {
+        if ($this->overrideWhere) return $this->where;
+        return $this->originalQueryProperties->getWhere();
+    }
+
+    public function getOrderBy() {
+        if ($this->overrideOrderBy) return $this->orderBy;
+        return $this->originalQueryProperties->getOrderBy();
+    }
+
+    public function getFields() {
+        if ($this->overrideFields) return $this->fields;
+        return $this->originalQueryProperties->getFields();
+    }
+
+    public function getGroupBy() {
+        if ($this->overrideGroupBy) return $this->groupBy;
+        return $this->originalQueryProperties->getGroupBy();
+    }
+
+    public function getLimit() {
+        if ($this->overrideLimit) return $this->limit;
+        return $this->originalQueryProperties->getIncludeRelations();
+    }
+
+    public function getOffset() {
+        if ($this->overrideOffset) return $this->offset;
+        return $this->originalQueryProperties->getIncludeRelations();
+    }
+
+    /**
+     * @param mixed $includeRelations
+     * @return OverrideQueryProperties
+     */
+    public function overrideIncludeRelations($includeRelations) {
+        $this->overrideIncludeRelations = true;
+        $this->includeRelations = $includeRelations;
+        return $this;
+    }
+
+    /**
+     * @param mixed $where
+     * @return OverrideQueryProperties
+     */
+    public function overrideWhere($where) {
+        $this->overrideWhere = true;
+        $this->where = $where;
+        return $this;
+    }
+
+    /**
+     * @param mixed $orderBy
+     * @return OverrideQueryProperties
+     */
+    public function overrideOrderBy($orderBy) {
+        $this->overrideOrderBy = true;
+        $this->orderBy = $orderBy;
+        return $this;
+    }
+
+    /**
+     * @param mixed $fields
+     * @return OverrideQueryProperties
+     */
+    public function overrideFields($fields) {
+        $this->overrideFields = true;
+        $this->fields = $fields;
+        return $this;
+    }
+
+    /**
+     * @param mixed $groupBy
+     * @return OverrideQueryProperties
+     */
+    public function overrideGroupBy($groupBy) {
+        $this->overrideGroupBy = true;
+        $this->groupBy = $groupBy;
+        return $this;
+    }
+
+    /**
+     * @param mixed $limit
+     * @return OverrideQueryProperties
+     */
+    public function overrideLimit($limit) {
+        $this->overrideLimit = true;
+        $this->limit = $limit;
+        return $this;
+    }
+
+    /**
+     * @param mixed $offset
+     * @return OverrideQueryProperties
+     */
+    public function overrideOffset($offset) {
+        $this->overrideOffset = true;
+        $this->offset = $offset;
+        return $this;
     }
 }
