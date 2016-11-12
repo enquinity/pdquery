@@ -241,12 +241,13 @@ class Collection implements \IteratorAggregate, \Countable {
         return $this;
         //return new self($newdata);
     }
-    
+
     /**
      * @return IQuery
      */
     public function query($idFieldName = 'id') {
-        // TODO: implement!
+        $ds = new CollectionDataSource($this->data, $idFieldName);
+        return $ds->query();
     }
 
     public function getIterator() {

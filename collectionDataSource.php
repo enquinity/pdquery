@@ -31,8 +31,10 @@ class CollectionDataSource implements IDataSource {
     }
 
     public function getData(IQueryProperties $query, $selectOptions = null) {
+        // TODO: select flags
+        // TODO: return as collection wrapper
         ///$flags =
-        $returnAsArray = false;
+        $returnAsArray = true;
 
         $orderBy = $query->getOrderBy();
         $where = $query->getWhere();
@@ -101,12 +103,53 @@ class CollectionDataSource implements IDataSource {
     }
 
     protected function getFilteredRows(IQueryProperties $query, $offset = null, $limit = null) {
-        // TODO: obsługa indeksów
         $rows = [];
         $where = $query->getWhere();
         $decisionTreeBuilder = new FilterDecisionTreeBuilder();
         $decisionTree = $decisionTreeBuilder->build($where);
         $pos = -1;
+
+        $cond = $decisionTree[0][0];
+        if ($decisionTree[0][2] === false && ($cond['operator'] == '=' || $cond['operator'] == 'IN')) {
+            $field = array_key_exists('id', $cond) ? $this->keyFieldName : $cond['field'];
+            $condValue = array_key_exists('id', $cond) ? $cond['id'] : $cond['value'];
+
+            $keys = [];
+            if ($this->dataIndexedBy === $field) {
+                if (is_array($condValue)) {
+                    foreach ($condValue as $v) $keys[$v] = true;
+                } else {
+                    $keys[$condValue] = true;
+                }
+            } elseif (isset($this->indexes[$field])) {
+                if (is_array($condValue)) {
+                    foreach ($condValue as $cv) {
+                        if (isset($this->indexes[$field][$cv])) {
+                            foreach ($this->indexes[$field][$cv] as $k) $keys[$k] = true;
+                        }
+                    }
+                } else {
+                    if (isset($this->indexes[$field][$condValue])) {
+                        foreach ($this->indexes[$field][$condValue] as $k) $keys[$k] = true;
+                    }
+                }
+                if (count($keys) == 0) return []; // dla tej wartości nie ma wierszy w indeksie
+            }
+            if (count($keys) > 0) {
+                foreach ($keys as $key => $true) {
+                    $row = $this->data[$key];
+                    if (1 == count($decisionTree) || $this->checkFilter($row, $decisionTree)) {
+                        $pos++;
+                        if (null === $offset || $pos >= $offset) {
+                            if ($limit !== null && $pos >= $limit) break;
+                            $rows[] = $row;
+                        }
+                    }
+                }
+                return $rows;
+            }
+        }
+
         foreach ($this->data as $row) {
             if ($this->checkFilter($row, $decisionTree)) {
                 $pos++;
@@ -120,11 +163,52 @@ class CollectionDataSource implements IDataSource {
     }
 
     protected function getFilteredRowsGenerator(IQueryProperties $query, $offset = null, $limit = null) {
-        // TODO: obsługa indeksów
         $where = $query->getWhere();
         $decisionTreeBuilder = new FilterDecisionTreeBuilder();
         $decisionTree = $decisionTreeBuilder->build($where);
         $pos = -1;
+
+        $cond = $decisionTree[0][0];
+        if ($decisionTree[0][2] === false && ($cond['operator'] == '=' || $cond['operator'] == 'IN')) {
+            $field = array_key_exists('id', $cond) ? $this->keyFieldName : $cond['field'];
+            $condValue = array_key_exists('id', $cond) ? $cond['id'] : $cond['value'];
+
+            $keys = [];
+            if ($this->dataIndexedBy === $field) {
+                if (is_array($condValue)) {
+                    foreach ($condValue as $v) $keys[$v] = true;
+                } else {
+                    $keys[$condValue] = true;
+                }
+            } elseif (isset($this->indexes[$field])) {
+                if (is_array($condValue)) {
+                    foreach ($condValue as $cv) {
+                        if (isset($this->indexes[$field][$cv])) {
+                            foreach ($this->indexes[$field][$cv] as $k) $keys[$k] = true;
+                        }
+                    }
+                } else {
+                    if (isset($this->indexes[$field][$condValue])) {
+                        foreach ($this->indexes[$field][$condValue] as $k) $keys[$k] = true;
+                    }
+                }
+                if (count($keys) == 0) return; // dla tej wartości nie ma wierszy w indeksie
+            }
+            if (count($keys) > 0) {
+                foreach ($keys as $key => $true) {
+                    $row = $this->data[$key];
+                    if (1 == count($decisionTree) || $this->checkFilter($row, $decisionTree)) {
+                        $pos++;
+                        if (null === $offset || $pos >= $offset) {
+                            if ($limit !== null && $pos >= $limit) break;
+                            yield $row;
+                        }
+                    }
+                }
+                return;
+            }
+        }
+
         foreach ($this->data as $row) {
             if ($this->checkFilter($row, $decisionTree)) {
                 $pos++;
@@ -187,15 +271,64 @@ class CollectionDataSource implements IDataSource {
     }
 
     public function getFirst(IQueryProperties $query, $selectOptions = null) {
-        // TODO: Implement getFirst() method.
+        $orderBy = $query->getOrderBy();
+        $where = $query->getWhere();
+        if (empty($orderBy)) {
+            if (empty($where)) {
+                foreach ($this->data as $row) {
+                    return $row;
+                }
+                return null;
+            } else {
+                $rows = $this->getFilteredRows($query, null, 1);
+                return !empty($rows) ? $rows[0] : null;
+            }
+        } else {
+            $data = $this->getData($query);
+            foreach ($data as $row) {
+                return $row;
+            }
+            return null;
+        }
     }
 
     public function hasRows(IQueryProperties $query, $options = null) {
-        // TODO: Implement hasRows() method.
+        $where = $query->getWhere();
+        if (empty($where)) {
+            if ($this->data instanceof \Countable) {
+                return $this->data->count() > 0;
+            }
+            if (!is_array($this->data)) {
+                $this->data = iterator_to_array($this->data);
+            }
+            return count($this->data) > 0;
+        } else {
+            $rows = $this->getFilteredRowsGenerator($query);
+            foreach ($rows as $row) {
+                return true;
+            }
+            return false;
+        }
     }
 
     public function countRows(IQueryProperties $query, $countOptions = null) {
-        // TODO: Implement countRows() method.
+        $where = $query->getWhere();
+        if (empty($where)) {
+            if ($this->data instanceof \Countable) {
+                return $this->data->count();
+            }
+            if (!is_array($this->data)) {
+                $this->data = iterator_to_array($this->data);
+            }
+            return count($this->data);
+        } else {
+            $rows = $this->getFilteredRowsGenerator($query);
+            $cnt = 0;
+            foreach ($rows as $row) {
+                $cnt++;
+            }
+            return $cnt;
+        }
     }
 
     /**
