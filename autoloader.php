@@ -13,6 +13,8 @@ class Autoloader {
         }
         if ($clsName == 'Collection' || $clsName == 'CollectionTools') {
             require_once(__DIR__ . '/collection.php');
+        } elseif ($clsName == 'CollectionDataSource') {
+            require_once(__DIR__ . '/collectionDataSource.php');
         } elseif ($ns == 'pdquery\EntityModel') {
             require_once(__DIR__ . '/entityModel.php');
         } elseif ($ns == 'pdquery\Sql\Dialects') {

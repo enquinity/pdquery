@@ -1,7 +1,10 @@
 <?php
 /**
- * pdquery v2.0.0
+ * pdquery v2.1.0 [w trakcie rozwoju]
  * zmiany:
+ * 2.1.0
+ * - dodanie źródła CollectionDataSource [w trakcie rozwoju]
+ * - small fixes
  * 2.0.0
  * - usunięcie CountQuery (obiekty i interfejsy) - przeniesienie funkcjonalności do IQuery, zmiana nazwy metody w źródle na countRows [utrata kompatybilności wstecz]
  * - dodanie metody hasRows (IQuery, IDataSource) [utrata kompatybilności wstecz - konieczność zaimplementowania metody w źródle danych]
@@ -65,7 +68,7 @@ interface IQuery extends \Countable, \IteratorAggregate {
      * $query = new Query(); // lub w inny sposób pobieramy zapytanie (np. z repozytorium jakiegoś modelu)
      * $query->where('date', '>', '2015-05-05')
      *  ->where(
-     *      subWhere('date', '<', '2018')
+     *      where('date', '<', '2018')
      *               ->orWhere('status', 'planned'
      *  )
      *
@@ -183,7 +186,7 @@ interface IUpdateQuery {
      * $query = new Query(); // lub w inny sposób pobieramy zapytanie (np. z repozytorium jakiegoś modelu)
      * $query->where('date', '>', '2015-05-05')
      *  ->where(
-     *      subWhere('date', '<', '2018')
+     *      where('date', '<', '2018')
      *               ->orWhere('status', 'planned'
      *  )
      *
@@ -234,7 +237,7 @@ interface IDeleteQuery {
      * $query = new SelectQuery(); // lub w inny sposób pobieramy zapytanie (np. z repozytorium jakiegoś modelu)
      * $query->where('date', '>', '2015-05-05')
      *  ->where(
-     *      SelectQuery::subWhere('date', '<', '2018')
+     *      where('date', '<', '2018')
      *               ->orWhere('status', 'planned'
      *  )
      *
@@ -271,7 +274,7 @@ interface IWhereConditions {
      * $query = new SelectQuery(); // lub w inny sposób pobieramy zapytanie (np. z repozytorium jakiegoś modelu)
      * $query->where('date', '>', '2015-05-05')
      *  ->where(
-     *      SelectQuery::subWhere('date', '<', '2018')
+     *      where('date', '<', '2018')
      *               ->orWhere('status', 'planned'
      *  )
      *
