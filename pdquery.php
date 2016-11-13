@@ -1,10 +1,10 @@
 <?php
 /**
- * pdquery v2.1.0 [w trakcie rozwoju]
+ * pdquery v2.1.0
  * zmiany:
  * 2.1.0
- * - dodanie źródła CollectionDataSource [w trakcie rozwoju]
- * - small fixes
+ * - dodanie źródła CollectionDataSource
+ * - drobne poprawki
  * 2.0.0
  * - usunięcie CountQuery (obiekty i interfejsy) - przeniesienie funkcjonalności do IQuery, zmiana nazwy metody w źródle na countRows [utrata kompatybilności wstecz]
  * - dodanie metody hasRows (IQuery, IDataSource) [utrata kompatybilności wstecz - konieczność zaimplementowania metody w źródle danych]

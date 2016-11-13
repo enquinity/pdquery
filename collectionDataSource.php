@@ -30,139 +30,95 @@ class CollectionDataSource implements IDataSource {
         }
     }
 
-    public function getData(IQueryProperties $query, $selectOptions = null) {
-        // TODO: select flags
-        // TODO: return as collection wrapper
-        ///$flags =
-        $returnAsArray = true;
+    protected function getComparator($orderBy) {
+        if (count($orderBy) == 1) {
+            if (is_string($orderBy[0]['field'])) {
+                $comparator = function($a, $b) use ($orderBy) {
+                    $ob = $orderBy[0];
+                    if (is_string($a[$ob['field']]) || is_string($b[$ob['field']])) {
+                        $cmp = strcmp($a[$ob['field']], $b[$ob['field']]);
+                    } else {
+                        $cmp = $a[$ob['field']] > $b[$ob['field']] ? 1 : ($a[$ob['field']] < $b[$ob['field']] ? -1 : 0);
+                    }
+                    if ('ASC' != $ob['direction']) $cmp *= -1;
+                    return $cmp;
+                };
+            } else {
+                // używamy podanej z zewnątrz funkcji sortującej
+                $comparator = $orderBy[0]['field'];
+            }
+        } else {
+            $comparator = function($a, $b) use ($orderBy) {
+                foreach ($orderBy as $ob) {
+                    if (is_string($ob['field'])) {
+                        if (is_string($a[$ob['field']]) || is_string($b[$ob['field']])) {
+                            $cmp = strcmp($a[$ob['field']], $b[$ob['field']]);
+                        } else {
+                            $cmp = $a[$ob['field']] > $b[$ob['field']] ? 1 : ($a[$ob['field']] < $b[$ob['field']] ? -1 : 0);
+                        }
+                    } else {
+                        // używamy podanej z zewnątrz funkcji sortującej
+                        $cmp = call_user_func($ob['field'], $a, $b);
+                    }
+                    if ($cmp == 0) continue;
+                    if ('ASC' != $ob['direction']) $cmp *= -1;
+                    return $cmp;
+                }
+                return 0;
+            };
+        }
+        return $comparator;
+    }
 
+    public function getData(IQueryProperties $query, $selectOptions = null) {
+        $returnAsArray = false;
+        $wrapWithCollection = false;
+        if (!empty($selectOptions) && is_array($selectOptions) && !empty($selectOptions[0])) {
+            $sl = strlen($selectOptions[0]);
+            for ($p = 0; $p < $sl; $p++) {
+                switch ($selectOptions[0][$p]) {
+                    case 'a': $returnAsArray = true; break;
+                    case 'i': $returnAsArray = false; break;
+                    case 'x': $wrapWithCollection = true; break;
+                    default:
+                        throw new \Exception("Invalid flag " . $selectOptions[0][$p]);
+                }
+            }
+        }
         $orderBy = $query->getOrderBy();
         $where = $query->getWhere();
         $offset = $query->getOffset();
         $limit = $query->getLimit();
         if (empty($orderBy)) {
             if (empty($where)) {
-                return $this->data;
+                $result = $this->data;
             } else {
-                if ($returnAsArray) {
-                    return $this->getFilteredRows($query, $offset, $limit);
-                } else {
-                    return $this->getFilteredRowsGenerator($query, $offset, $limit);
-                }
+                $result = $returnAsArray ? $this->getFilteredRowsArray($query, $offset, $limit) :
+                    $this->getFilteredRowsGenerator($query, $offset, $limit);
             }
         } else {
-            $data = empty($where) ? $this->data : $this->getFilteredRows($query);
+            $data = empty($where) ? $this->data : $this->getFilteredRowsArray($query);
             if (!is_array($data)) {
                 $data = iterator_to_array($data);
             }
-            if (count($orderBy) == 1) {
-                if (is_string($orderBy[0]['field'])) {
-                    usort($data, function($a, $b) use ($orderBy) {
-                        $ob = $orderBy[0];
-                        if (is_string($a[$ob['field']]) || is_string($b[$ob['field']])) {
-                            $cmp = strcmp($a[$ob['field']], $b[$ob['field']]);
-                        } else {
-                            $cmp = $a[$ob['field']] > $b[$ob['field']] ? 1 : ($a[$ob['field']] < $b[$ob['field']] ? -1 : 0);
-                        }
-                        if ('ASC' != $ob['direction']) $cmp *= -1;
-                        return $cmp;
-                    });
-                } else {
-                    // używamy podanej z zewnątrz funkcji sortującej
-                    usort($data, $orderBy[0]['field']);
-                }
-            } else {
-                usort($data, function($a, $b) use ($orderBy) {
-                    foreach ($orderBy as $ob) {
-                        if (is_string($ob['field'])) {
-                            if (is_string($a[$ob['field']]) || is_string($b[$ob['field']])) {
-                                $cmp = strcmp($a[$ob['field']], $b[$ob['field']]);
-                            } else {
-                                $cmp = $a[$ob['field']] > $b[$ob['field']] ? 1 : ($a[$ob['field']] < $b[$ob['field']] ? -1 : 0);
-                            }
-                        } else {
-                            // używamy podanej z zewnątrz funkcji sortującej
-                            $cmp = call_user_func($ob['field'], $a, $b);
-                        }
-                        if ($cmp == 0) continue;
-                        if ('ASC' != $ob['direction']) $cmp *= -1;
-                        return $cmp;
-                    }
-                    return 0;
-                });
-            }
+            usort($data, $this->getComparator($orderBy));
             if ($returnAsArray) {
                 if ($offset !== null || $limit !== null) {
                     $data = array_slice($data, $offset !== null ? $offset : 0, $limit, false);
                 }
-                return $data;
+                $result = $data;
             } else {
-                return $this->getRangeGenerator($data, $offset, $limit);
+                $result = $this->getRangeGenerator($data, $offset, $limit);
             }
         }
+        if ($wrapWithCollection) {
+            $result = new Collection($result);
+        }
+        return $result;
     }
 
-    protected function getFilteredRows(IQueryProperties $query, $offset = null, $limit = null) {
-        $rows = [];
-        $where = $query->getWhere();
-        $decisionTreeBuilder = new FilterDecisionTreeBuilder();
-        $decisionTree = $decisionTreeBuilder->build($where);
-        $pos = -1;
-
-        $cond = $decisionTree[0][0];
-        if ($decisionTree[0][2] === false && ($cond['operator'] == '=' || $cond['operator'] == 'IN')) {
-            $field = array_key_exists('id', $cond) ? $this->keyFieldName : $cond['field'];
-            $condValue = array_key_exists('id', $cond) ? $cond['id'] : $cond['value'];
-
-            $keys = [];
-            if ($this->dataIndexedBy === $field) {
-                if (is_array($condValue)) {
-                    foreach ($condValue as $v) $keys[$v] = true;
-                } else {
-                    $keys[$condValue] = true;
-                }
-            } elseif (isset($this->indexes[$field])) {
-                if (is_array($condValue)) {
-                    foreach ($condValue as $cv) {
-                        if (isset($this->indexes[$field][$cv])) {
-                            foreach ($this->indexes[$field][$cv] as $k) $keys[$k] = true;
-                        }
-                    }
-                } else {
-                    if (isset($this->indexes[$field][$condValue])) {
-                        foreach ($this->indexes[$field][$condValue] as $k) $keys[$k] = true;
-                    }
-                }
-                if (count($keys) == 0) return []; // dla tej wartości nie ma wierszy w indeksie
-            }
-            if (count($keys) > 0) {
-                foreach ($keys as $key => $true) {
-                    $row = $this->data[$key];
-                    if (1 == count($decisionTree) || $this->checkFilter($row, $decisionTree)) {
-                        $pos++;
-                        if (null === $offset || $pos >= $offset) {
-                            if ($limit !== null && $pos >= $limit) break;
-                            $rows[] = $row;
-                        }
-                    }
-                }
-                return $rows;
-            }
-        }
-
-        foreach ($this->data as $row) {
-            if ($this->checkFilter($row, $decisionTree)) {
-                $pos++;
-                if (null === $offset || $pos >= $offset) {
-                    if ($limit !== null && $pos >= $limit) break;
-                    $rows[] = $row;
-                }
-            }
-        }
-        return $rows;
-    }
-
-    protected function getFilteredRowsGenerator(IQueryProperties $query, $offset = null, $limit = null) {
+    protected function getFilteredRows(IQueryProperties $query, $returnAsGenerator, &$rows, $offset = null, $limit = null) {
+        if (!$returnAsGenerator) $rows = [];
         $where = $query->getWhere();
         $decisionTreeBuilder = new FilterDecisionTreeBuilder();
         $decisionTree = $decisionTreeBuilder->build($where);
@@ -201,7 +157,11 @@ class CollectionDataSource implements IDataSource {
                         $pos++;
                         if (null === $offset || $pos >= $offset) {
                             if ($limit !== null && $pos >= $limit) break;
-                            yield $row;
+                            if ($returnAsGenerator) {
+                                yield $row;
+                            } else {
+                                $rows[] = $row;
+                            }
                         }
                     }
                 }
@@ -214,10 +174,32 @@ class CollectionDataSource implements IDataSource {
                 $pos++;
                 if (null === $offset || $pos >= $offset) {
                     if ($limit !== null && $pos >= $limit) break;
-                    yield $row;
+
+                    if ($returnAsGenerator) {
+                        yield $row;
+                    } else {
+                        $rows[] = $row;
+                    }
                 }
             }
         }
+    }
+
+    protected function getFilteredRowsArray(IQueryProperties $query, $offset = null, $limit = null) {
+        $rows = null;
+        $g = $this->getFilteredRows($query, false, $rows, $offset, $limit);
+
+        // aby powyższa funkcja się wykonała, gdyż PHP widzi ją jako generator
+        // pętla nie powinna mieć żadnej iteracji, jednak jest potrzebna do uruchomienia powyższej metody
+        foreach ($g as $whatever) {
+            throw new \Exception("Unexpected instruction");
+        }
+        return $rows;
+    }
+
+    protected function getFilteredRowsGenerator(IQueryProperties $query, $offset = null, $limit = null) {
+        $null = null;
+        return $this->getFilteredRows($query, true, $null);
     }
 
     protected function checkFilter($row, array $whereDecisionTree) {
@@ -249,7 +231,13 @@ class CollectionDataSource implements IDataSource {
                     break;
                 case 'IN': $accept = in_array($rowValue, $condValue); break;
                 case 'NOT IN': $accept = !in_array($rowValue, $condValue); break;
-                // TODO: like and not like
+                case 'LIKE': // FALL THROUGH
+                case 'NOT LIKE':
+                    $regex = '/^' . str_replace([chr(18), '%'], ['.', '.*'], preg_quote(str_replace('?', chr(18), $condValue))) . '$/';
+                    $accept = (preg_match($regex, $rowValue) ? true : false) ^ ($condOperator != 'LIKE');
+                    break;
+                default:
+                    throw new \Exception("Unsupported operator $condOperator");
             }
 
             $result = $whereDecisionTree[$pos][$accept ? 1 : 2];
@@ -280,15 +268,22 @@ class CollectionDataSource implements IDataSource {
                 }
                 return null;
             } else {
-                $rows = $this->getFilteredRows($query, null, 1);
+                $rows = $this->getFilteredRowsArray($query, null, 1);
                 return !empty($rows) ? $rows[0] : null;
             }
         } else {
-            $data = $this->getData($query);
+            $comparator = $this->getComparator($orderBy);
+            $data = empty($where) ? $this->data : $this->getFilteredRowsGenerator($query);
+            $result = null;
             foreach ($data as $row) {
-                return $row;
+                if (null === $result) {
+                    $result = $row;
+                } else {
+                    $cmp = call_user_func($comparator, $row, $result);
+                    if (-1 == $cmp) $result = $row;
+                }
             }
-            return null;
+            return $result;
         }
     }
 
