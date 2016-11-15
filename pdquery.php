@@ -1,7 +1,9 @@
 <?php
 /**
- * pdquery v2.1.0
+ * pdquery v2.2.0
  * zmiany:
+ * 2.2.0
+ * - wsparcie dla SQLite
  * 2.1.0
  * - dodanie źródła CollectionDataSource
  * - drobne poprawki
