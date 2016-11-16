@@ -168,7 +168,7 @@ class SqliteDialect implements ISqlDialect {
     }
 
     protected function escStr($str) {
-        return \SQLite3::escapeString($str);
+        return "'" . \SQLite3::escapeString($str) . "'";
     }
 
     public function encodeColumnAlias($columnAlias) {
