@@ -664,3 +664,127 @@ class DeleteQueryBuilder extends BaseQueryBuilder {
         return $sql;
     }
 }
+
+class InsertQueryBuilder {
+
+    const EntityFields = 1;
+    const FirstRowFields = 2;
+
+    /**
+     * @var IEntityModel
+     */
+    protected $entityModel;
+
+    protected $maxRowsInSingleInsert = 500;
+
+    protected $maxSingleInsertLength = 100000;
+
+    public function __construct(IEntityModel $entityModel) {
+        $this->entityModel = $entityModel;
+    }
+
+    /**
+     * Generator zwracający zapytania insert.
+     *
+     * @param ISqlDialect $sqlDialect Docelowy dialekt dla zapytań
+     * @param mixed       $data       Dane do wstawienia - jako tablica/iterator tablic asocjacyjnych/obiektów
+     * @param mixed $fields Pola do wstawienia - jako tablica nazw pól
+     *                      lub stała EntityFields - wszystkie pola z encji
+     *                      lub stała FirstRowFields - pierwszy element danych określa listę pól do wstawienia
+     * @return \Generator
+     */
+    public function sqls(ISqlDialect $sqlDialect, $entityName, $data, $fields = null) {
+        if (null === $fields) $fields = self::EntityFields;
+        $insertFields = null;
+        if (is_array($fields)) {
+            $insertFields = $fields;
+        } elseif ($fields === self::EntityFields) {
+            $insertFields = $this->entityModel->getEntityFieldNames($entityName);
+        } elseif ($fields === self::FirstRowFields) {
+            // EMPTY
+        }
+        $insertStub = null;
+        $current = null;
+        foreach ($data as $row) {
+            if (null === $insertStub) {
+                if (null === $insertFields) {
+                    if (is_array($row)) {
+                        $insertFields = array_keys($row);
+                    } else {
+                        $insertFields = [];
+                        foreach ($row as $field => $whatevet) {
+                            $insertFields[] = $field;
+                        }
+                    }
+                }
+
+                $insertFieldTypes = [];
+                $insertStub = '';
+                foreach ($insertFields as $key => $insertField) {
+                    if ('' !== $insertStub) $insertStub .= ',';
+                    $insertStub .= $sqlDialect->encodeColumnName($this->entityModel->getDbColumnName($entityName, $insertField));
+
+                    $insertFieldTypes[$key] = $this->entityModel->getFieldType($entityName, $insertField);
+                }
+                $insertStub = 'INSERT INTO ' . $sqlDialect->encodeTableName($this->entityModel->getDbTableName($entityName)) . '(' . $insertStub . ') VALUES ';
+                $insertStubLen = strlen($insertStub);
+            }
+            if (null === $current) {
+                $current = $insertStub;
+                $currentLen = $insertStubLen;
+                $currentRows = 0;
+            }
+
+            $rowSql = '';
+            $valuesSql = '';
+            foreach ($insertFields as $key => $insertField) {
+                if ('' !== $valuesSql) $valuesSql .= ',';
+                if (is_array($row) && array_key_exists($insertField, $row)) {
+                    $value = $row[$insertField];
+                } elseif (is_object($row) && property_exists($row, $insertField)) {
+                    $value = $row->$insertField;
+                } else {
+                    $valuesSql .= 'DEFAULT';
+                    continue;
+                }
+                $valuesSql .= $sqlDialect->valueToSql($value, $insertFieldTypes[$key]);
+            }
+
+            if ($currentRows > 0) {
+                $rowSql .= ',';
+            }
+            $rowSql .= '(' . $valuesSql . ')';
+            $rowSqlLen = strlen($rowSql);
+
+            $current .= $rowSql;
+            $currentRows++;
+            $currentLen += $rowSqlLen;
+
+            if ($currentRows >= $this->maxRowsInSingleInsert || $currentLen >= $this->maxSingleInsertLength) {
+                yield $current;
+                $current = null;
+            }
+        }
+        if ($currentRows > 0) {
+            yield $current;
+        }
+    }
+
+    /**
+     * @param int $maxRowsInSingleInsert
+     * @return InsertQueryBuilder
+     */
+    public function setMaxRowsInSingleInsert($maxRowsInSingleInsert) {
+        $this->maxRowsInSingleInsert = $maxRowsInSingleInsert;
+        return $this;
+    }
+
+    /**
+     * @param int $maxSingleInsertLength
+     * @return InsertQueryBuilder
+     */
+    public function setMaxSingleInsertLength($maxSingleInsertLength) {
+        $this->maxSingleInsertLength = $maxSingleInsertLength;
+        return $this;
+    }
+}
