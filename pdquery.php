@@ -1,8 +1,10 @@
 <?php
 /**
- * pdquery v2.3.0
+ * pdquery v3.1128.0
  * zmiany:
- * 2.3.0
+ * 3.1128.0
+ * - rozbudowa definicji IDataSourceUpdater.insertData - dodanie parametru fields
+ * - zmiana systemu wersjonowania - wprowadzenie daty do środkowego członu zamiast cyfr
  * - dodanie klasy InsertQueryBuilder
  * 2.2.0
  * - wsparcie dla SQLite
@@ -37,9 +39,14 @@ interface IDataSourceUpdater {
     public function deleteData(IDeleteQueryProperties $query, $deleteOptions = null);
 
     /**
-     * @param mixed $data Tablica lub iterator; elementami są tablice asocjacyjne lub obiekty.
+     * @param mixed $data   Tablica lub iterator; elementami są tablice asocjacyjne lub obiekty.
+     * @param mixed $fields Pola, które mają być wstawione. Możliwe wartości:
+     *                      a) '*' - wszystkie pola w encji
+     *                      b) tablica z nazwami pól
+     *                      c) null - ustalane automatycznie (na podstawie pierwszego wiersza w danych)
+     * @return
      */
-    public function insertData($data);
+    public function insertData($data, $fields = null);
 
     /**
      * @return IUpdateQuery
