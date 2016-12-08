@@ -1,7 +1,9 @@
 <?php
 /**
- * pdquery v3.1128.0
+ * pdquery v3.1128.1
  * zmiany:
+ * 3.1128.1
+ * - poprawka błędu przy obliczaniu counta
  * 3.1128.0
  * - rozbudowa definicji IDataSourceUpdater.insertData - dodanie parametru fields
  * - zmiana systemu wersjonowania - wprowadzenie daty do środkowego członu zamiast cyfr
@@ -515,7 +517,7 @@ class Query extends BaseQuery implements IQuery, IQueryProperties {
     }
 
     public function count() {
-        return $this->dataSource->getRowsCount($this);
+        return $this->dataSource->countRows($this);
     }
 
     public function hasRows() {
