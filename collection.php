@@ -59,6 +59,24 @@ class CollectionTools {
         return self::asArray(self::getProperty($collection, $propertyName));
     }
 
+    public static function createMap($collection, $indexPropertyName, $valuePropertyName) {
+        $indexed = [];
+        if (is_string($indexPropertyName)) {
+            $fieldName = $indexPropertyName;
+            foreach ($collection as $item) {
+                $key = is_array($item) ? (isset($item[$fieldName]) ? $item[$fieldName] : null) : ($item->$fieldName);
+                $indexed[$key] = $item[$valuePropertyName];
+            }
+        } else {
+            $callback = $indexPropertyName;
+            foreach ($collection as $item) {
+                $key = call_user_func($callback, $item);
+                $indexed[$key] = $item[$valuePropertyName];
+            }
+        }
+        return $indexed;
+    }
+
     public static function map($collection, callable $callback, $preserveKeys = true) {
         foreach ($collection as $key => $item) {
             if ($preserveKeys) {
@@ -137,7 +155,7 @@ class CollectionTools {
 
 
 
-class Collection implements \IteratorAggregate, \Countable {
+class Collection implements \IteratorAggregate, \Countable, \ArrayAccess {
     protected $data;
     
     public function __construct($data) {
@@ -167,7 +185,7 @@ class Collection implements \IteratorAggregate, \Countable {
 
     /**
      * 
-     * @return this
+     * @return $this
      */    
     public function mapAll(callable $callback) {
         $this->data = $callback($this->data);
@@ -176,7 +194,7 @@ class Collection implements \IteratorAggregate, \Countable {
 
     /**
      * 
-     * @return this
+     * @return $this
      */
     public function map(callable $callback, $preserveKeys = true) {
         $newdata = CollectionTools::map($this->data, $callback, $preserveKeys);
@@ -187,7 +205,7 @@ class Collection implements \IteratorAggregate, \Countable {
 
     /**
      * 
-     * @return this
+     * @return $this
      */
     public function filter(callable $callback, $preserveKeys = false) {
         $newdata = CollectionTools::filter($this->data, $callback, $preserveKeys);
@@ -198,7 +216,7 @@ class Collection implements \IteratorAggregate, \Countable {
 
     /**
      * 
-     * @return this
+     * @return $this
      */    
     public function append($collection2, $preserveKeys = false) {
         $this->data = CollectionTools::concat($this->data, $collection2, $preserveKeys);
@@ -213,7 +231,7 @@ class Collection implements \IteratorAggregate, \Countable {
     }
 
     /**
-     * @return this
+     * @return $this
      */
     public function getProperty($propertyName) {
         $newdata = CollectionTools::getProperty($this->data, $propertyName);
@@ -223,7 +241,7 @@ class Collection implements \IteratorAggregate, \Countable {
     }
 
     /**
-     * @return this
+     * @return $this
      */
     public function indexBy($fieldNameOrCallback) {
         $newdata = CollectionTools::indexBy($this->data, $fieldNameOrCallback);
@@ -233,7 +251,15 @@ class Collection implements \IteratorAggregate, \Countable {
     }
 
     /**
-     * @return this
+     * @return $this
+     */
+    public function createMap($indexPropertyName, $valuePropertyName) {
+        $this->data = CollectionTools::createMap($this->data, $indexPropertyName, $valuePropertyName);
+        return $this;
+    }
+
+    /**
+     * @return $this
      */
     public function groupBy($fieldNameOrCallback) {
         $newdata = CollectionTools::groupBy($this->data, $fieldNameOrCallback);
@@ -258,5 +284,84 @@ class Collection implements \IteratorAggregate, \Countable {
 
     public function count() {
         return count($this->data);
+    }
+
+    private function prepareDataForArrayAccess() {
+        if (is_array($this->data)) return;
+        if ($this->data instanceof \ArrayAccess) return;
+        $this->data = CollectionTools::asArray($this->data);
+    }
+
+
+    public function get($key, $defaultValue = null) {
+        if (!is_array($this->data)) $this->prepareDataForArrayAccess();
+        if (is_array($this->data)) {
+            return array_key_exists($key, $this->data) ? $this->data[$key] :$defaultValue;
+        } elseif ($this->data instanceof \ArrayAccess) {
+            return $this->data->offsetExists($key) ? $this->data->offsetGet($key) : $defaultValue;
+        } else {
+            throw new \Exception("PdQuery collection internal error - invalid inner data type");
+        }
+    }
+
+    public function req($key) {
+        if (!is_array($this->data)) $this->prepareDataForArrayAccess();
+        if (is_array($this->data)) {
+            if (!array_key_exists($key, $this->data)) {
+                throw new \Exception("Required key $key not found in collection");
+            }
+            return $this->data[$key];
+        } elseif ($this->data instanceof \ArrayAccess) {
+            if (!$this->data->$this->offsetExists($key)) {
+                throw new \Exception("Required key $key not found in collection");
+            }
+            return $this->data->offsetGet($key);
+        } else {
+            throw new \Exception("PdQuery collection internal error - invalid inner data type");
+        }
+    }
+
+    public function offsetExists($offset) {
+        if (!is_array($this->data)) $this->prepareDataForArrayAccess();
+        if (is_array($this->data)) {
+            return array_key_exists($offset, $this->data);
+        } elseif ($this->data instanceof \ArrayAccess) {
+            return $this->data->offsetExists($offset);
+        } else {
+            throw new \Exception("PdQuery collection internal error - invalid inner data type");
+        }
+    }
+
+    public function offsetGet($offset) {
+        if (!is_array($this->data)) $this->prepareDataForArrayAccess();
+        if (is_array($this->data)) {
+            return $this->data[$offset];
+        } elseif ($this->data instanceof \ArrayAccess) {
+            return $this->data->offsetGet($offset);
+        } else {
+            throw new \Exception("PdQuery collection internal error - invalid inner data type");
+        }
+    }
+
+    public function offsetSet($offset, $value) {
+        if (!is_array($this->data)) $this->prepareDataForArrayAccess();
+        if (is_array($this->data)) {
+            $this->data[$offset] = $value;
+        } elseif ($this->data instanceof \ArrayAccess) {
+            $this->data->offsetSet($offset, $value);
+        } else {
+            throw new \Exception("PdQuery collection internal error - invalid inner data type");
+        }
+    }
+
+    public function offsetUnset($offset) {
+        if (!is_array($this->data)) $this->prepareDataForArrayAccess();
+        if (is_array($this->data)) {
+            unset($this->data[$offset]);
+        } elseif ($this->data instanceof \ArrayAccess) {
+            $this->data->offsetUnset($offset);
+        } else {
+            throw new \Exception("PdQuery collection internal error - invalid inner data type");
+        }
     }
 }

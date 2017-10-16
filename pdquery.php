@@ -1,7 +1,9 @@
 <?php
 /**
- * pdquery v3.1128.1
+ * pdquery v3.2216.0
  * zmiany:
+ * 3.2216.0 (2017-10-16)
+ * - rozbudowa kolekcji - nowe metody
  * 3.1128.1
  * - poprawka błędu przy obliczaniu counta
  * 3.1128.0
